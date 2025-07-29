@@ -135,3 +135,43 @@ for nome_arquivo in os.listdir(caminho_pasta):
         resultado = "Cachorro" if predicao >= 0.5 else "Gato"
 
         print(f"{nome_arquivo}: {resultado} (confiança: {predicao:.2f})")
+
+#gerar respostas com imagens e rotolo com o resultado
+import os
+import numpy as np
+from PIL import Image
+import tensorflow as tf
+import matplotlib.pyplot as plt
+
+# Caminho da pasta com imagens
+pasta_imagens = "/content/Imagens para testar"
+IMG_SIZE = 224  # mesmo usado no treino
+
+# Função para carregar e preparar a imagem
+def carregar_imagem_vgg16(caminho_imagem):
+    imagem = Image.open(caminho_imagem).convert("RGB")
+    imagem = imagem.resize((IMG_SIZE, IMG_SIZE))
+    imagem_array = np.array(imagem)
+    imagem_processada = tf.keras.applications.vgg16.preprocess_input(imagem_array)
+    return np.expand_dims(imagem_processada, axis=0), imagem_array  # retorna a imagem pronta e a original para mostrar
+
+# Percorre e exibe as imagens com resultado
+arquivos = sorted([f for f in os.listdir(pasta_imagens) if f.lower().endswith(('.jpg', '.jpeg'))])
+
+plt.figure(figsize=(15, 10))
+
+for i, nome_arquivo in enumerate(arquivos[:9]):  # mostra até 9 imagens
+    caminho = os.path.join(pasta_imagens, nome_arquivo)
+    imagem_processada, imagem_original = carregar_imagem_vgg16(caminho)
+
+    pred = model.predict(imagem_processada)[0][0]
+    resultado = "Cachorro 🐶" if pred >= 0.5 else "Gato 🐱"
+
+    # Mostra a imagem com legenda
+    plt.subplot(3, 3, i + 1)
+    plt.imshow(imagem_original.astype('uint8'))
+    plt.title(f"{nome_arquivo}\n{resultado} ({pred:.2f})", fontsize=10)
+    plt.axis('off')
+
+plt.tight_layout()
+plt.show()
