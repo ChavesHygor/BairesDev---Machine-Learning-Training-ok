@@ -1,1 +1,137 @@
+#importar bibliotecas
+import tensorflow as tf
+import tensorflow_datasets as tfds
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras import layers, models
+from tensorflow.keras.preprocessing import image_dataset_from_directory
+import os
+#baixar o modelo pronto
+!wget https://github.com/fchollet/deep-learning-models/releases/download/v0.1/vgg16_weights_tf_dim_ordering_tf_kernels.h5
+#carregar o modelo
+IMG_SIZE = 224  # VGG16 espera imagens 224x224
 
+#Primeiro carregar o modelo sem pesos com weights=None
+#Depois carregar manualmente com .load_weights(...)
+from tensorflow.keras.applications import VGG16
+
+base_model = VGG16(
+    weights='imagenet',
+    include_top=False,
+    input_shape=(224, 224, 3)
+)
+base_model.trainable = False
+
+#Congelar as camadas da VGG16, evita que os pesos variem
+base_model.trainable = False
+#Criar a nova cabeça para o modelo (Cat X Dog)
+model = models.Sequential([
+    base_model,
+    layers.Flatten(),
+    layers.Dense(256, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(1, activation='sigmoid')  # saída binária: gato vs cachorro
+])
+
+# Compilar o modelo
+model.compile(
+    optimizer='adam',
+    loss='binary_crossentropy',
+    metrics=['accuracy']
+)
+#carregar o dataset e definir os dados de treino
+(raw_train, raw_test), metadata = tfds.load(
+    'cats_vs_dogs',
+    split=['train[:80%]', 'train[80%:]'],  # 80% treino, 20% teste
+    with_info=True,
+    as_supervised=True  # Retorna tuplas (imagem, rótulo)
+)
+#Pré-processar seus dados para o VGG16
+def format_example(image, label):
+    image = tf.image.resize(image, (IMG_SIZE, IMG_SIZE))
+    image = tf.keras.applications.vgg16.preprocess_input(image)  # Normaliza do jeito que o VGG espera
+    return image, label
+
+train_batches = raw_train.map(format_example).batch(32).prefetch(1)
+test_batches = raw_test.map(format_example).batch(32).prefetch(1)
+#Treinar
+history = model.fit(
+    train_batches,
+    epochs=5,
+    validation_data=test_batches
+)
+# Plota a acurácia e perda do modelo ao longo do tempo
+import matplotlib.pyplot as plt
+EPOCHS=5
+acc = history.history['accuracy'] #history.history é um dicionário com os valores de cada métrica a cada época.
+val_acc = history.history['val_accuracy'] #Extrai a acurácia do conjunto de validação/teste.
+
+loss = history.history['loss'] #Pegam as perdas (erros) no treino
+val_loss = history.history['val_loss'] ##Pegam as perdas (erros) na validação
+
+epochs_range = range(EPOCHS) #Cria uma sequência de valores de 0 até EPOCHS - 1, para o eixo horizontal dos gráficos.
+
+plt.figure(figsize=(12, 6)) #Cria uma nova figura do matplotlib com tamanho 12x6 polegadas.
+
+plt.subplot(1, 2, 1) #Divide a figura em 1 linha, 2 colunas, e ativa a posição 1 (esquerda).
+plt.plot(epochs_range, acc, label='Acurácia Treino') #Plota a curva da acurácia de treino ao longo das épocas.
+plt.plot(epochs_range, val_acc, label='Acurácia Validação') #Plota a curva da acurácia da validação.
+plt.legend(loc='lower right') #Adiciona uma legenda no canto inferior direito.
+plt.title('Acurácia') #Define o título do gráfico.
+
+plt.subplot(1, 2, 2) #Ativa a posição 2 da figura (direita).
+plt.plot(epochs_range, loss, label='Perda Treino') #Plota as curvas da função de perda (erro) para treino
+plt.plot(epochs_range, val_loss, label='Perda Validação') #Plota as curvas da função de perda (erro) para validação
+plt.legend(loc='upper right')#Coloca legenda no gráfico da direita.
+plt.title('Perda')#Coloca tirulo no gráfico da direita.
+
+plt.show() #mostra tudo
+
+#salvar o modelo no colab
+model.save('modelo_gato_cachorro.h5')
+#baixar o modelo no notbook
+from google.colab import files
+files.download('modelo_gato_cachorro.h5')
+#Bônus: Refinamento (opcional)
+base_model.trainable = True
+
+# Congela apenas até a camada 15 (por exemplo)
+for layer in base_model.layers[:15]:
+    layer.trainable = False
+#Bônus: Refinamento (opcional)
+base_model.trainable = True
+
+# Congela apenas até a camada 15 (por exemplo)
+for layer in base_model.layers[:15]:
+    layer.trainable = False
+#testar com novas imagens
+import os
+import numpy as np
+from PIL import Image
+import tensorflow as tf
+
+# Caminho da pasta com imagens
+caminho_pasta = "/content/Imagens para testar"
+IMG_SIZE = 224  # Mesmo tamanho usado no treino
+
+# Função para carregar, redimensionar e normalizar
+def carregar_imagem_vgg16(caminho_imagem):
+    imagem = Image.open(caminho_imagem).convert("RGB")
+    imagem = imagem.resize((IMG_SIZE, IMG_SIZE))
+    imagem = np.array(imagem)
+    imagem = tf.keras.applications.vgg16.preprocess_input(imagem)  # Normalização igual ao treino
+    return np.expand_dims(imagem, axis=0)  # Adiciona dimensão do batch
+
+# Carrega o modelo salvo (se ainda não tiver feito)
+model = tf.keras.models.load_model("modelo_gato_cachorro.h5")
+
+# Percorre as imagens na pasta
+for nome_arquivo in os.listdir(caminho_pasta):
+    if nome_arquivo.lower().endswith(".jpg") or nome_arquivo.lower().endswith(".jpeg"):
+        caminho_completo = os.path.join(caminho_pasta, nome_arquivo)
+        imagem_processada = carregar_imagem_vgg16(caminho_completo)
+        predicao = model.predict(imagem_processada)[0][0]
+
+        # Interpreta a saída (0 = gato, 1 = cachorro)
+        resultado = "Cachorro" if predicao >= 0.5 else "Gato"
+
+        print(f"{nome_arquivo}: {resultado} (confiança: {predicao:.2f})")
