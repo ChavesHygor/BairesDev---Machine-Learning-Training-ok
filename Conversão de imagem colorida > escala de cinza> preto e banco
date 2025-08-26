@@ -1,0 +1,65 @@
+# Importa as bibliotecas necessárias
+from PIL import Image
+import matplotlib.pyplot as plt
+from google.colab import files
+import io
+# --- ETAPA 1: UPLOAD DA IMAGEM ---
+print("Por favor, escolha o arquivo de imagem colorida para processar:")
+uploaded = files.upload()
+
+# Verifica se um arquivo foi carregado antes de prosseguir
+if not uploaded:
+    print("\nNenhum arquivo foi selecionado. Execute a célula novamente para tentar de novo.")
+else:
+    # Pega o nome e o conteúdo do arquivo carregado
+    nome_do_arquivo_original = next(iter(uploaded))
+    conteudo_do_arquivo = uploaded[nome_do_arquivo_original]
+
+    # Abre a imagem a partir dos dados carregados
+    imagem_colorida = Image.open(io.BytesIO(conteudo_do_arquivo))
+
+    # --- ETAPA 2: MOSTRAR IMAGEM ORIGINAL ---
+    print("\n--- Imagem 1: Original Colorida ---")
+    plt.figure(figsize=(6, 6))
+    plt.imshow(imagem_colorida)
+    plt.title('Imagem Original Colorida')
+    plt.axis('off')
+    plt.show()
+
+    # --- ETAPA 3: CONVERTER, MOSTRAR E SALVAR EM ESCALA DE CINZA ---
+    print("\nConvertendo para escala de cinza...")
+    imagem_cinza = imagem_colorida.convert('L') # 'L' representa o modo de luminância
+
+    print("--- Imagem 2: Resultado em Escala de Cinza ---")
+    plt.figure(figsize=(6, 6))
+    plt.imshow(imagem_cinza, cmap='gray')
+    plt.title('Imagem em Escala de Cinza')
+    plt.axis('off')
+    plt.show()
+
+    # Disponibilizar a imagem em escala de cinza para download
+    nome_base, extensao = nome_do_arquivo_original.rsplit('.', 1)
+    caminho_cinza = f"{nome_base}_cinza.png"
+    imagem_cinza.save(caminho_cinza)
+    print(f"✅ Imagem em escala de cinza pronta! Clique abaixo para salvar como '{caminho_cinza}':")
+    files.download(caminho_cinza)
+
+
+    # --- ETAPA 4: CONVERTER, MOSTRAR E SALVAR IMAGEM BINARIZADA ---
+    print("\nConvertendo para preto e branco (binarizado)...")
+    limiar = 128  # Pixels > 128 viram brancos (255), os outros viram pretos (0)
+    imagem_binaria = imagem_cinza.point(lambda p: 255 if p > limiar else 0, '1')
+
+    print("--- Imagem 3: Resultado Binarizado (Preto e Branco) ---")
+    plt.figure(figsize=(6, 6))
+    plt.imshow(imagem_binaria, cmap='gray')
+    plt.title('Imagem Binarizada (Preto e Branco)')
+    plt.axis('off')
+    plt.show()
+
+    # Disponibilizar a imagem binarizada para download
+    caminho_binario = f"{nome_base}_binario.png"
+    imagem_binaria.save(caminho_binario)
+    print(f"✅ Imagem binarizada pronta! Clique abaixo para salvar como '{caminho_binario}':")
+    files.download(caminho_binario)
+#converter de colorida diretamente para binario consiste em simplemente "esconder" a etapa de conversão para escala de cinza
